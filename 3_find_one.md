@@ -196,23 +196,7 @@ db.trips.find({
 
 ---
 
-# **7. Regex (Pattern Matching)**
-
-### Find trips with “Beach” in title:
-
-```js
-db.trips.find({ title: /beach/i })
-```
-
-### Find destinations starting with G:
-
-```js
-db.trips.find({ destination: /^G/ })
-```
-
----
-
-# **8. Sorting, Limiting, Skipping, Pagination**
+# **7. Sorting, Limiting, Skipping, Pagination**
 
 ### **Sort**
 
@@ -241,7 +225,7 @@ db.trips.find().skip((page - 1) * limit).limit(limit)
 
 ---
 
-# **9. Querying Embedded Documents**
+# **8. Querying Embedded Documents**
 
 ### Embedded Object Example:
 
