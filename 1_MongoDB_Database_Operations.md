@@ -191,11 +191,6 @@ db.runCommand({ validate: "trips" })
 * Prefer consistent fields
 * Avoid very deep nesting
 
----
-
-# **8. Case Study: Hands-On Activities (Travel App)**
-
-You can conduct this as a classroom lab.
 
 ---
 
