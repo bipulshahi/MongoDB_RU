@@ -286,11 +286,3 @@ Write a command to insert a new user:
 
 **Q4 (Practical):**
 Write a command to insert 3 trips at once using `insertMany()`.
-
-**Q5 (Hybrid):**
-Your CSV import for `partners` has 1 bad row.
-Which option will allow MongoDB to insert all valid rows and skip the bad one?
-
----
-
-If this is clear, I can move to **Topic 5: MongoDB FIND Methods** (full lecture with operators, projections, sorting, pagination, filtering, regex, nested queries, and case-study examples).
