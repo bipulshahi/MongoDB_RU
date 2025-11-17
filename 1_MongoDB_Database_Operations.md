@@ -276,16 +276,26 @@ db.createCollection("partners")
 **Q1 (Theory):**
 Why doesn’t MongoDB create a database immediately when you run `use travelDB`?
 
-**Q2 (Theory):**
-What is the difference between an embedded document and a referenced document? Give a travel-app example.
+- use travelDB only switches your shell’s current database context to travelDB. MongoDB only actually creates a database when you perform a write that persists something (create a collection, insert a document, or create an index). Until a write happens, there’s nothing on disk for MongoDB to create.
 
-**Q3 (Practical):**
+**Q2 (Practical):**
 Write a command to create the collection `offers` explicitly.
 
-**Q4 (Practical):**
+- db.createCollection("offers")
+
+**Q3 (Practical):**
 You mistakenly inserted wrong trips into the collection. Write the command to remove the entire collection.
 
-**Q5 (Hybrid):**
+- db.trips.drop()
+- db.trips.deleteMany({})
+- db.trips.deleteOne({
+  title: "Kerala Backwater Cruise",
+  price: NumberDecimal("24999.50"),
+  startDate: ISODate("2026-08-10")
+})
+
+
+**Q4 (Hybrid):**
 Look at this document and identify at least 3 BSON data types used:
 
 ```js
@@ -297,3 +307,28 @@ Look at this document and identify at least 3 BSON data types used:
   ratings: { avg: 4.7, count: 322 }
 }
 ```
+
+- Here are at least 3 BSON data types present in the document:
+
+String
+Example: "Kerala Backwater Cruise", "houseboat", "dinner"
+
+Decimal128
+Example: NumberDecimal("24999.50")
+
+Date
+Example: ISODate("2026-08-10")
+
+Additional BSON types also present:
+
+Array
+Example: features: ["houseboat", "dinner"]
+
+Embedded Document (Object)
+Example: ratings: { avg: 4.7, count: 322 }
+
+Double
+Example: avg: 4.7
+
+Integer (int32/int64)
+Example: count: 322
