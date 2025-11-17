@@ -166,8 +166,6 @@ db.runCommand({ validate: "trips" })
 
 # **7. Naming Conventions (VERY Important for Beginners)**
 
-MongoDB is flexible, but set rules for students:
-
 ### **Database names**
 
 * lowercase
