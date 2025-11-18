@@ -168,8 +168,3 @@ db.students.countDocuments()
 * Use `insertOne` for single documents, `insertMany` for multiple.
 * Use `ordered:false` for resilience when inserting many docs.
 * Always verify using `find()` or `countDocuments()`.
-
----
-
-That completes **Step 1 — Inserts**.
-Shall I proceed to **Step 2 (MongoDB Find Methods & Query Operators)** now? If yes, reply “go ahead” and I’ll continue.
