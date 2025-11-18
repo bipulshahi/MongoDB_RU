@@ -181,7 +181,7 @@ Avoid using:
 
 ---
 
-# **6. insert with Validation Errors (You should show this!)**
+# **6. insert with Validation Errors**
 
 If a schema validator is applied, invalid documents will fail.
 
