@@ -1,12 +1,8 @@
-Great — I’ll split this case study into **4 clear steps** and follow your instruction: after I finish **Step 1** I’ll ask you whether to proceed, then continue when you say “go ahead”. Everything will be beginner-friendly, with short explanations, examples (mongo shell / MongoDB Compass friendly), tasks for students and their full answers.
-
----
-
-# Case study: Student records (MongoDB) — Step 1 of 4
+# Case study: Student records (MongoDB)
 
 **Topics covered in this step:** MongoDB **Insert** methods (insertOne, insertMany, bulkWrite), best-practice tips, how to verify inserted data.
 
-We’ll use the `students` collection and the document set you provided. Assume the shell/URI is connected and the database is selected, e.g.:
+We’ll use the `students` collection. Assume the shell/URI is connected and the database is selected, e.g.:
 
 ```js
 use yourDatabaseName
