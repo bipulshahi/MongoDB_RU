@@ -101,7 +101,7 @@ db.students.findOne({ name: "Aniket" })
 * `scores`: [{subject: "Programming", score: 86}]
   Do it with `insertOne`, then show the inserted document using `findOne`.
 
-**Solution (teacher answer):**
+**Solution:**
 
 ```js
 // Insert
@@ -149,7 +149,7 @@ db.students.insertMany([
 
 **Instruction:** After inserting all provided documents, run a count and answer: **How many documents are in `students`?** (Assume only the original provided list was inserted and no other documents.)
 
-**Solution (teacher answer):**
+**Solution:**
 If you inserted the 16 documents you provided plus any additional ones inserted in Tasks above (e.g., Rohit, Asha, Vivek), use:
 
 ```js
