@@ -844,7 +844,7 @@ Options like `sort` or `projection` are supported.
 
 ---
 
-## 4. Safety patterns (always teach these)
+## 4. Safety patterns
 
 ### a) Verify before deleting
 
