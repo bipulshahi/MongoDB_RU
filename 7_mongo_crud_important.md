@@ -455,3 +455,327 @@ You now know:
 * How to search inside arrays and nested structures
 
 
+# MongoDB Update Methods + Update Operators
+
+In this step we cover:
+
+1. `updateOne()`
+2. `updateMany()`
+3. Update operators:
+
+   * `$set`, `$unset`
+   * `$inc`
+   * `$push`, `$addToSet`
+   * `$pull`
+   * `$rename`
+   * `$max`, `$min`
+4. Updating values inside arrays (including positional operator `$`)
+5. Student tasks with answers
+
+---
+
+# 1. updateOne()
+
+Updates **only the first matching document**.
+
+Example: Increase Aniket’s age to 23.
+
+```js
+db.students.updateOne(
+  { name: "Aniket" },          // filter
+  { $set: { age: 23 } }        // update
+)
+```
+
+---
+
+# 2. updateMany()
+
+Updates **all matching documents**.
+
+Example: Add a new field `status: "active"` to all students older than 20.
+
+```js
+db.students.updateMany(
+  { age: { $gt: 20 } },
+  { $set: { status: "active" } }
+)
+```
+
+---
+
+# 3. Important Update Operators
+
+---
+
+## `$set`
+
+Add or replace a field.
+
+```js
+db.students.updateOne(
+  { name: "Riya" },
+  { $set: { scholarship: true } }
+)
+```
+
+---
+
+## `$unset`
+
+Remove a field.
+
+```js
+db.students.updateOne(
+  { name: "Riya" },
+  { $unset: { scholarship: 1 } }
+)
+```
+
+---
+
+## `$inc`
+
+Increment a numeric value.
+
+Example: Increase Sneha’s age by 1.
+
+```js
+db.students.updateOne(
+  { name: "Sneha" },
+  { $inc: { age: 1 } }
+)
+```
+
+---
+
+## `$push`
+
+Add a new element to an array.
+
+Example: Add "Cloud Computing" to Isha’s subjects.
+
+```js
+db.students.updateOne(
+  { name: "Isha" },
+  { $push: { subjects: "Cloud Computing" } }
+)
+```
+
+---
+
+## `$addToSet`
+
+Add to array **only if it does not already exist**.
+
+```js
+db.students.updateOne(
+  { name: "Isha" },
+  { $addToSet: { subjects: "Statistics" } }
+)
+```
+
+Statistics was already present, so nothing is added.
+
+---
+
+## `$pull`
+
+Remove array element(s).
+
+Example: Remove “Math” from Rahul’s subjects.
+
+```js
+db.students.updateOne(
+  { name: "Rahul" },
+  { $pull: { subjects: "Math" } }
+)
+```
+
+---
+
+## `$rename`
+
+Rename a field.
+
+Example: Rename `graduation_Date` to `graduationDate`.
+
+```js
+db.students.updateMany(
+  { graduation_Date: { $exists: true } },
+  { $rename: { graduation_Date: "graduationDate" } }
+)
+```
+
+---
+
+## `$max` / `$min`
+
+Set a value only if condition is met.
+
+Example: If a student’s recorded age is less than 18, set it to 18.
+
+```js
+db.students.updateMany(
+  {},
+  { $max: { age: 18 } }
+)
+```
+
+Example: Lower max value.
+
+```js
+db.students.updateMany(
+  { name: "Priya" },
+  { $min: { age: 25 } }
+)
+```
+
+---
+
+# 4. Updating Nested Arrays (Very Important)
+
+### Goal: Update a score inside `scores` array.
+
+Use the **positional operator `$`**, which finds the index of the matched array item.
+
+### Example:
+
+Update Aniket’s AI score from 88 to 90.
+
+```js
+db.students.updateOne(
+  { name: "Aniket", "scores.subject": "AI" },
+  { $set: { "scores.$.score": 90 } }
+)
+```
+
+Explanation:
+
+* MongoDB finds the index where `scores.subject == "AI"`
+* `$` plugs in that index
+* Only that element is updated
+
+---
+
+# 5. Updating embedded array by adding a new score
+
+Example: Add a new score for “OS” to Rohit.
+
+```js
+db.students.updateOne(
+  { name: "Rohit" },
+  { $push: { scores: { subject: "OS", score: 78 } } }
+)
+```
+
+---
+
+---
+
+## Task 1 (Easy)
+
+**Increase Riya’s age by 1 using `$inc`. Then verify.**
+
+**Answer:**
+
+```js
+db.students.updateOne(
+  { name: "Riya" },
+  { $inc: { age: 1 } }
+)
+
+db.students.findOne({ name: "Riya" })
+```
+
+---
+
+## Task 2 (Easy)
+
+**Add a new field `enrolled: true` to all Computer Science students.**
+
+**Answer:**
+
+```js
+db.students.updateMany(
+  { major: "Computer Science" },
+  { $set: { enrolled: true } }
+)
+```
+
+---
+
+## Task 3 (Medium)
+
+**Add “Algorithms” to Priya’s subjects.
+Use `$addToSet` so it does not duplicate.**
+
+**Answer:**
+
+```js
+db.students.updateOne(
+  { name: "Priya" },
+  { $addToSet: { subjects: "Algorithms" } }
+)
+```
+
+---
+
+## Task 4 (Medium)
+
+**Remove the subject "Physics" from Rahul’s subjects array.**
+
+**Answer:**
+
+```js
+db.students.updateOne(
+  { name: "Rahul" },
+  { $pull: { subjects: "Physics" } }
+)
+```
+
+---
+
+## Task 5 (Hard)
+
+**Increase the score of Vikram in Surveying from 81 to 90.
+Use array positional operator.**
+
+**Answer:**
+
+```js
+db.students.updateOne(
+  { name: "Vikram", "scores.subject": "Surveying" },
+  { $set: { "scores.$.score": 90 } }
+)
+```
+
+---
+
+## Task 6 (Hard)
+
+**Rename graduation_Date to graduationDate for all documents.**
+
+**Answer:**
+
+```js
+db.students.updateMany(
+  { graduation_Date: { $exists: true } },
+  { $rename: { graduation_Date: "graduationDate" } }
+)
+```
+
+---
+
+# Summary
+
+You now know:
+
+* updateOne vs updateMany
+* All core update operators
+* How to update nested arrays using `$`
+* How to control additions and removals in arrays
+
+
+
+
