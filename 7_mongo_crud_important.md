@@ -776,6 +776,462 @@ You now know:
 * How to update nested arrays using `$`
 * How to control additions and removals in arrays
 
+---
+Perfect — here is **Step 4 (final step)**: MongoDB **Delete Methods** plus a clean **end-to-end workflow** that ties Insert → Find → Update → Delete together using your `students` dataset. Everything is beginner-friendly, with classroom tasks and full answers.
+
+---
+
+# MongoDB Delete Methods + End-to-End Workflow
+
+## What we cover
+
+1. `deleteOne()` and `deleteMany()` — usage and safety tips
+2. `findOneAndDelete()` — atomic find+delete with return of deleted doc
+3. Best-practices before deleting (verify, backup pattern)
+4. Conditional deletes and safe patterns
+5. Final end-to-end case study (sequence of commands you can run)
+6. Student tasks with answers
+
+---
+
+## 1. `deleteOne(filter)`
+
+Removes **the first document** that matches `filter`.
+
+```js
+// Delete Riya (age 17) — single delete
+db.students.deleteOne({ name: "Riya" })
+```
+
+Return value example:
+
+```js
+{ "acknowledged" : true, "deletedCount" : 1 }
+```
+
+**Note:** If multiple docs match, only the first matching document (according to internal order) is removed.
+
+---
+
+## 2. `deleteMany(filter)`
+
+Removes **all documents** matching the filter.
+
+```js
+// Delete all students older than 26
+db.students.deleteMany({ age: { $gt: 26 } })
+```
+
+Return value:
+
+```js
+{ "acknowledged" : true, "deletedCount" : N }
+```
+
+---
+
+## 3. `findOneAndDelete(filter, options)`
+
+Finds a document, deletes it, and returns the deleted document in one atomic operation. Useful when you want the removed doc back (for audit/logging).
+
+```js
+// Remove and return first student with major "Chemistry"
+const removed = db.students.findOneAndDelete({ major: "Chemistry" })
+printjson(removed)
+```
+
+Options like `sort` or `projection` are supported.
+
+---
+
+## 4. Safety patterns (always teach these)
+
+### a) Verify before deleting
+
+Always run a `find()` with the same filter first so you know exactly what will be deleted.
+
+```js
+db.students.find({ major: "Chemistry" }).pretty()
+```
+
+### b) Back up matching documents (optional but recommended)
+
+If you want a simple backup copy into another collection:
+
+```js
+// Copy documents to backup collection first
+db.students.find({ major: "Chemistry" }).forEach(function(doc) {
+  db.students_backup.insertOne(doc);
+});
+
+// Then delete
+db.students.deleteMany({ major: "Chemistry" })
+```
+
+### c) Use a limited `deleteOne()` when unsure
+
+Prefer `deleteOne()` instead of `deleteMany()` if you're not certain.
+
+### d) Use transactions (when using replica sets / sharded clusters)
+
+For multi-document multi-collection operations that must be all-or-nothing, use transactions. (Intro mention only — not diving into code for now.)
+
+---
+
+## 5. Conditional deletes examples using your dataset
+
+### Example A — Delete students under 18 (minor cleanup)
+
+```js
+db.students.deleteMany({ age: { $lt: 18 } })
+```
+
+(With dataset this would delete Riya if she still exists.)
+
+### Example B — Delete students who have graduated before 2023
+
+Note: You might have `graduation_Date` or `graduationDate` depending on previous renames. Use `$or` to cover both field names:
+
+```js
+db.students.deleteMany({
+  $or: [
+    { graduation_Date: { $exists: true, $lt: ISODate("2023-01-01") } },
+    { graduationDate: { $exists: true, $lt: ISODate("2023-01-01") } }
+  ]
+})
+```
+
+### Example C — Remove a student by `_id` (safest when you know exact doc)
+
+```js
+db.students.deleteOne({ _id: ObjectId("...") })
+```
+
+---
+
+## 6. Combined end-to-end case study (complete workflow)
+
+This walks students through a realistic maintenance task. Each step shows commands and expected outcomes.
+
+**Scenario:**
+The department wants to:
+
+1. Add a field `enrolled: true` to all current Computer Science & Artificial Intelligence students.
+2. Give any Computer Science or AI student a new `scores` entry for "Ethics" with score 80 — but **only** if they don't already have "Ethics" (avoid duplicate).
+3. Find and list those updated students.
+4. Remove any students who graduated before 2023 after backing them up.
+
+**Commands (run in order):**
+
+### Step A — Verify who will be updated
+
+```js
+db.students.find(
+  { major: { $in: ["Computer Science", "Artificial Intelligence"] } },
+  { name: 1, major: 1, graduation_Date: 1, graduationDate: 1 }
+).pretty()
+```
+
+### Step B — Add `enrolled: true`
+
+```js
+db.students.updateMany(
+  { major: { $in: ["Computer Science", "Artificial Intelligence"] } },
+  { $set: { enrolled: true } }
+)
+```
+
+*Expected result:* `modifiedCount` equals number of CS + AI docs.
+
+### Step C — Add "Ethics" score only if not present (use `$addToSet` with `$each` and `$cond` not available directly for arrays of objects, so we use a safe per-document approach)*
+
+Because `scores` is an array of objects, `$addToSet` won't prevent duplicate *objects* unless they exactly match. To avoid duplicate subject entries, run an update that only targets documents that **don't** already have `scores.subject: "Ethics"`:
+
+```js
+db.students.updateMany(
+  {
+    major: { $in: ["Computer Science", "Artificial Intelligence"] },
+    "scores.subject": { $ne: "Ethics" }    // ensure no Ethics entry exists
+  },
+  {
+    $push: { scores: { subject: "Ethics", score: 80 } }
+  }
+)
+```
+
+*Explanation:* the filter ` "scores.subject": { $ne: "Ethics" }` ensures only documents without an "Ethics" subject get the new score.
+
+### Step D — Verify updated docs
+
+```js
+db.students.find(
+  {
+    major: { $in: ["Computer Science", "Artificial Intelligence"] },
+    enrolled: true
+  },
+  { name: 1, enrolled: 1, scores: 1, _id: 0 }
+).pretty()
+```
+
+### Step E — Backup students who graduated before 2023 (safe delete)
+
+```js
+// 1) Select those docs (use both field names)
+const toRemoveCursor = db.students.find({
+  $or: [
+    { graduation_Date: { $exists: true, $lt: ISODate("2023-01-01") } },
+    { graduationDate: { $exists: true, $lt: ISODate("2023-01-01") } }
+  ]
+})
+
+// 2) Copy to backup
+toRemoveCursor.forEach(function(doc) {
+  db.students_archived.insertOne(doc);
+})
+
+// 3) Confirm backup count equals found count
+// (In shell, count manually)
+print("Archived count:", db.students_archived.countDocuments())
+
+// 4) Now remove from primary collection
+db.students.deleteMany({
+  $or: [
+    { graduation_Date: { $exists: true, $lt: ISODate("2023-01-01") } },
+    { graduationDate: { $exists: true, $lt: ISODate("2023-01-01") } }
+  ]
+})
+```
+
+### Step F — Final verification
+
+```js
+// Remaining students count
+db.students.countDocuments()
+
+// See the backup collection
+db.students_archived.find().pretty()
+```
+
+---
+
+## 7. Tasks
+
+### Task 1 (Easy)
+
+**Find and delete the student named "Diya" using `findOneAndDelete` and show the deleted document.**
+
+**Answer**
+
+```js
+const deleted = db.students.findOneAndDelete({ name: "Diya" })
+printjson(deleted)
+```
+
+*Expected:* `deleted` contains Diya’s document. The primary collection no longer has Diya.
+
+---
+
+### Task 2 (Medium)
+
+**Backup and delete all students whose major is "Civil Engineering". Provide the commands.**
+
+**Answer**
+
+```js
+// 1) Backup
+db.students.find({ major: "Civil Engineering" }).forEach(function(doc) {
+  db.students_backup.insertOne(doc);
+});
+
+// 2) Delete
+db.students.deleteMany({ major: "Civil Engineering" })
+```
+
+---
+
+### Task 3 (Medium)
+
+**Delete all students who do NOT have a `graduation_Date` or `graduationDate` field (i.e., remove incomplete records). First list them, then delete.**
+
+**Answer**
+
+```js
+// 1) find them
+db.students.find({
+  graduation_Date: { $exists: false },
+  graduationDate: { $exists: false }
+}).pretty()
+
+// 2) delete them
+db.students.deleteMany({
+  graduation_Date: { $exists: false },
+  graduationDate: { $exists: false }
+})
+```
+
+*Note:* This may delete many records; emphasize backup before running.
+
+---
+
+### Task 4 (Hard)
+
+**You want to delete only one student who has the lowest Math score across all students. Outline steps and provide shell commands.**
+
+**Answer (step-by-step):**
+
+1. Find the student with lowest Math score using aggregation to get minimal score and the student(s).
+2. Delete one of those students using `_id`.
+
+```js
+// 1) Find min Math score and the student(s)
+const minRes = db.students.aggregate([
+  { $unwind: "$scores" },
+  { $match: { "scores.subject": "Math" } },
+  { $sort: { "scores.score": 1 } },
+  { $limit: 1 },
+  { $project: { _id: 1, name: 1, "scores.score": 1 } }
+]).toArray()
+
+printjson(minRes)
+
+// 2) Delete that student by _id (assuming minRes[0]._id exists)
+db.students.deleteOne({ _id: minRes[0]._id })
+```
+
+*note:* Aggregation is useful when deletions depend on computed results. Always capture `_id` and verify before deleting.
+
+---
+
+# MongoDB Short Quiz
+
+## Q1.
+
+Which command inserts **multiple** documents into a MongoDB collection at once?
+
+A. insertOne
+B. insertMany
+C. addMany
+D. pushMany
+
+**Answer:** B. insertMany
+
+---
+
+## Q2.
+
+Write a query to find all students whose **age is greater than 22**.
+
+**Answer:**
+
+```js
+db.students.find({ age: { $gt: 22 } })
+```
+
+---
+
+## Q3.
+
+Which projection will display **only name and major**, and hide `_id`?
+
+A. `{ name:1, major:1 }`
+B. `{ name:1, major:1, _id:0 }`
+C. `{ name:0, major:1, _id:0 }`
+D. `{ major:1, _id:1 }`
+
+**Answer:** B. `{ name:1, major:1, _id:0 }`
+
+---
+
+## Q4.
+
+Find all students who study **AI** (inside their subjects array).
+
+**Answer:**
+
+```js
+db.students.find({ subjects: "AI" })
+```
+
+---
+
+## Q5.
+
+Which operator is used to **increment** a numeric value in a document?
+
+A. $inc
+B. $set
+C. $addToSet
+D. $push
+
+**Answer:** A. $inc
+
+---
+
+## Q6.
+
+Update student **Aniket's AI score** to **90**, assuming “AI” is inside the nested scores array.
+
+**Answer:**
+
+```js
+db.students.updateOne(
+  { name: "Aniket", "scores.subject": "AI" },
+  { $set: { "scores.$.score": 90 } }
+)
+```
+
+---
+
+## Q7.
+
+Write a query to **delete all students younger than 18**.
+
+**Answer:**
+
+```js
+db.students.deleteMany({ age: { $lt: 18 } })
+```
+
+---
+
+## Q8.
+
+Which operator **removes** an item from an array?
+
+A. $push
+B. $pull
+C. $pop
+D. $unset
+
+**Answer:** B. $pull
+
+---
+
+## Q9.
+
+Find all students who have a **graduation date field**, regardless of value.
+
+**Answer:**
+
+```js
+db.students.find({ graduationDate: { $exists: true } })
+```
+
+(or `graduation_Date` depending on naming)
+
+---
+
+## Q10.
+
+Explain the difference between **deleteOne** and **deleteMany** in one line.
+
+**Answer:**
+*deleteOne removes only the first matching document, while deleteMany removes all matching documents.*
+
+---
+
+
+
 
 
 
