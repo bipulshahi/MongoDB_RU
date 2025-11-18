@@ -88,7 +88,7 @@ db.students.findOne({ name: "Aniket" })
 
 ---
 
-## 5. Student tasks (classroom exercises) — with answers
+## 5. Exercises
 
 ### Task 1 (Easy)
 
