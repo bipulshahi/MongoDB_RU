@@ -335,7 +335,7 @@ db.students.find({ subjects: { $all: ["Programming", "AI"] } })
 
 ---
 
-# 6. Useful classroom examples using your dataset
+# 6. Useful examples using
 
 ### Example 1: All students older than 24
 
@@ -775,9 +775,6 @@ You now know:
 * All core update operators
 * How to update nested arrays using `$`
 * How to control additions and removals in arrays
-
----
-Perfect — here is **Step 4 (final step)**: MongoDB **Delete Methods** plus a clean **end-to-end workflow** that ties Insert → Find → Update → Delete together using your `students` dataset. Everything is beginner-friendly, with classroom tasks and full answers.
 
 ---
 
