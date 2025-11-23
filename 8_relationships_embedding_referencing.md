@@ -1,4 +1,4 @@
-## MongoDB Relationships (Using Your `students` Data)
+## MongoDB Relationships (Using `students` Data)
 
 ### 1.1 What is a "relationship" in MongoDB?
 
@@ -362,5 +362,350 @@ For large scale, **Option B: `enrollments` collection** is more flexible because
 So for a **real university portal**, a separate `enrollments` collection is a better long-term design.
 
 ---
+---
 
+# **MongoDB Embedding Documents**
+
+Focus area: *When to embed, how to embed, how to query embedded fields, plus assignments.*
+
+We will continue using your `students` dataset and expand it logically as if this were a **University Student Portal**.
+
+Our goal here is to understand embedding **not just as arrays**, but *structured sub-documents* that model real-world entities.
+
+---
+
+## 2.1 What is Embedding in MongoDB?
+
+**Embedding** means storing related data *inside* a document rather than separating it into another collection.
+
+Example (simple):
+
+```js
+{
+  name: "Riya",
+  address: {
+    city: "Delhi",
+    pincode: 110001
+  }
+}
+```
+
+This is different from referencing where we would store:
+
+```js
+address_id: ObjectId("...reference here...")
+```
+
+---
+
+## 2.2 When is Embedding Recommended?
+
+Embed when:
+
+1. Data belongs to the parent entity naturally ("is part of").
+2. Data is *read together* most of the time.
+3. The number of subdocuments is small and bounded.
+4. Data is mostly static or does not require cross-document updates.
+5. You want fewer collections and simpler queries.
+
+Use embedding for:
+
+* Student identity card info
+* Student address
+* List of scores
+* Contact details
+
+NOT ideal for:
+
+* Many-to-many relations
+* Data frequently updated independently
+* Data shared across multiple parents
+
+---
+
+## 2.3 Real Embedding Example (Add Address to Student)
+
+Let’s embed **address information** inside student documents.
+
+### Insert Example
+
+We add address for "Aniket":
+
+```js
+db.students.updateOne(
+  { name: "Aniket" },
+  {
+    $set: {
+      address: {
+        street: "Sector 10 Road",
+        city: "Noida",
+        state: "UP",
+        pincode: 201301
+      }
+    }
+  }
+);
+```
+
+### What the updated document looks like
+
+```js
+{
+  name: "Aniket",
+  age: 22,
+  major: "Computer Science",
+  subjects: ["Programming", "Database", "AI"],
+  scores: [...],
+  address: {
+    street: "Sector 10 Road",
+    city: "Noida",
+    state: "UP",
+    pincode: 201301
+  }
+}
+```
+
+This is embedding because `address` becomes *a part of student*.
+
+---
+
+## 2.4 Querying Embedded Fields
+
+### Find students by city
+
+```js
+db.students.find({ "address.city": "Noida" });
+```
+
+### Show only name and city (projection)
+
+```js
+db.students.find(
+  { "address.city": "Noida" },
+  { name: 1, "address.city": 1, _id: 0 }
+);
+```
+
+### Find with nested conditions
+
+Students in UP with pincode above 200000:
+
+```js
+db.students.find({
+  "address.state": "UP",
+  "address.pincode": { $gt: 200000 }
+});
+```
+
+---
+
+## 2.5 Larger Embedding Example — Full Student Identity Details
+
+Let's embed a richer structure:
+
+```js
+db.students.updateOne(
+  { name: "Sneha" },
+  {
+    $set: {
+      identity: {
+        id_card_no: "IT2025SNE001",
+        issued_by: "Registrar Office",
+        valid_till: ISODate("2029-01-01"),
+        emergency_contact: {
+          name: "Ramesh Kumar",
+          relation: "Father",
+          phone: "9876543210"
+        }
+      }
+    }
+  }
+);
+```
+
+This demonstrates **multi-level embedding**.
+
+---
+
+## 2.6 When NOT to Embed (Important Theory)
+
+Do **NOT** embed if:
+
+| Case                                       | Reason                            | Example                                    |
+| ------------------------------------------ | --------------------------------- | ------------------------------------------ |
+| Document may grow unbounded                | MongoDB limit = 16MB per document | Student → books borrowed over many years   |
+| Data reused across entities                | Duplication issues                | Course reused across many students         |
+| Heavy update operations needed on children | Updating parent becomes costly    | Scores updated often across many semesters |
+| Many-to-many relationships                 | Natural relational structure      | Students ↔ Courses                         |
+
+Example of bad embedding:
+
+```js
+// Wrong design — embedding entire course documents into students
+{ name: "Aniket", courses: [{ full_course_object_here }, ...] }
+```
+
+This leads to duplication and inconsistent updates.
+
+---
+
+### **(Easy)**
+
+Add a simple address field (city + state only) to **"Diya"** using embedding.
+
+**Task:**
+Write an update query to store:
+City: Jaipur
+State: Rajasthan
+
+**Solution:**
+
+```js
+db.students.updateOne(
+  { name: "Diya" },
+  {
+    $set: {
+      address: {
+        city: "Jaipur",
+        state: "Rajasthan"
+      }
+    }
+  }
+);
+```
+
+Verify:
+
+```js
+db.students.find({ name: "Diya" }, { address: 1 });
+```
+
+---
+
+### **(Medium)**
+
+Add *educational history* as embedded documents (multiple entries).
+
+Data to insert for `"Arjun"`:
+
+| Field     | Value            |
+| --------- | ---------------- |
+| Course    | BSc Mathematics  |
+| Year      | 2022             |
+| Institute | Delhi University |
+
+Also add:
+
+| Field     | Value        |
+| --------- | ------------ |
+| Course    | Class 12     |
+| Year      | 2020         |
+| Institute | DPS RK Puram |
+
+**Solution:**
+
+```js
+db.students.updateOne(
+  { name: "Arjun" },
+  {
+    $set: {
+      education: [
+        { course: "BSc Mathematics", year: 2022, institute: "Delhi University" },
+        { course: "Class 12", year: 2020, institute: "DPS RK Puram" }
+      ]
+    }
+  }
+);
+```
+
+Verify:
+
+```js
+db.students.find({ name: "Arjun" }, { education: 1 });
+```
+
+---
+
+### **(Hard)**
+
+We want to embed **semester-wise scores** instead of a flat list.
+Design a schema for `"Karan"` where scores are grouped like this:
+
+```
+Semester 1:
+- Deep Learning: 94
+Semester 2:
+- NLP: 91
+```
+
+This means convert:
+
+```js
+scores: [
+  { subject: "Deep Learning", score: 94 },
+  { subject: "NLP", score: 91 }
+]
+```
+
+Into:
+
+```js
+scores: [
+  {
+    semester: 1,
+    subjects: [
+      { name: "Deep Learning", score: 94 }
+    ]
+  },
+  {
+    semester: 2,
+    subjects: [
+      { name: "NLP", score: 91 }
+    ]
+  }
+]
+```
+
+**Solution:**
+
+```js
+db.students.updateOne(
+  { name: "Karan" },
+  {
+    $set: {
+      scores: [
+        {
+          semester: 1,
+          subjects: [
+            { name: "Deep Learning", score: 94 }
+          ]
+        },
+        {
+          semester: 2,
+          subjects: [
+            { name: "NLP", score: 91 }
+          ]
+        }
+      ]
+    }
+  }
+);
+```
+
+Verification query (search nested field):
+
+```js
+db.students.find(
+  { "scores.subjects.name": "Deep Learning" },
+  { name: 1, scores: 1 }
+);
+```
+
+We covered here:
+
+* Multi-level embedding
+* Querying deeply nested structures
+* Schema redesign thinking
+
+---
 
