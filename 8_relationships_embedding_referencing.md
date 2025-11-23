@@ -1055,4 +1055,397 @@ Why this is correct:
 * Works for large systems
 
 ---
+---
+
+# 4 — **MongoDB Schema Design Best Practices**
+
+Focus:
+
+* Decide when to embed vs reference
+* Avoid common MongoDB schema mistakes
+* Redesign your existing `students` dataset properly
+* Include 1e, 1m, 1h assignments (with full solutions)
+* Keep things beginner-friendly, practical, real-world
+
+---
+
+## 4.1 MongoDB Schema Philosophy
+
+MongoDB is not SQL.
+Schema decisions are based on **how data will be used**, not just how data relates.
+
+SQL thinking:
+"Normalize to remove duplication."
+
+MongoDB thinking:
+"Optimize for read patterns, size, update frequency, and data access."
+
+The right approach is often a **hybrid**.
+
+---
+
+## 4.2 Quick Framework: Embed vs Reference
+
+Use this decision table:
+
+| Condition                        | Choose               | Reason                        |
+| -------------------------------- | -------------------- | ----------------------------- |
+| Data belongs logically to parent | Embed                | Natural containment           |
+| Data accessed often with parent  | Embed                | Faster reads                  |
+| Small bounded subdocuments       | Embed                | Fits size constraints         |
+| Shared across entities           | Reference            | Avoid duplication             |
+| Many-to-Many                     | Reference (junction) | Normalization                 |
+| Grows unbounded                  | Reference            | Avoid hitting document limits |
+| Updated independently            | Reference            | Fewer writes                  |
+
+---
+
+## 4.3 Applying Rules to Your `students` Dataset
+
+Current structure:
+
+* `subjects` → embedded array of strings → Good
+* `scores` → embedded array of objects → Good
+* `graduation_Date` → single field → Good
+* `major` as text → For scaling, consider referencing department
+* Courses not stored → Should be referenced (many-to-many)
+* Identity card (if added) → Embed (1–1 small data)
+
+So, our structure is mostly correct, but can be improved for scalability.
+
+---
+
+## 4.4 Good vs Bad Schema Examples
+
+### Bad: Storing full course objects inside each student
+
+```js
+courses: [
+  { code: "CS101", title: "Intro to Programming", credits: 3 },
+  { code: "AI201", title: "Intro to AI", credits: 4 }
+]
+```
+
+Problem:
+
+* Duplication across thousands of students
+* Updates require editing every student document
+
+### Fix: Store references instead
+
+```js
+course_ids: [
+  ObjectId("66c1c1111111111111111111"),
+  ObjectId("66c1c1222222222222222222")
+]
+```
+
+Better: Use `enrollments` collection (already discussed).
+
+---
+
+## 4.5 Proper Final Schema Design (Improved Version)
+
+Below is a clean, scalable, industry-style schema based on our dataset.
+
+### **students**
+
+```js
+{
+  _id: ObjectId(),
+  name: "Aniket",
+  age: 22,
+  department_id: ObjectId("...CSE..."),
+  subjects: ["Programming", "Database", "AI"],
+
+  scores: [
+    {
+      semester: 1,
+      subjects: [
+        { name: "Math", score: 95 },
+        { name: "AI", score: 88 }
+      ]
+    }
+  ],
+
+  identity: {
+    id_card_no: "CSE2024ANI001",
+    issued_by: "Registrar Office",
+    valid_till: ISODate("2029-01-01")
+  },
+
+  address: {
+    city: "Noida",
+    state: "UP",
+    pincode: 201301
+  },
+
+  graduation_date: ISODate("2024-07-01")
+}
+```
+
+### **departments**
+
+```js
+{
+  _id: ObjectId(),
+  code: "CSE",
+  name: "Computer Science"
+}
+```
+
+### **courses**
+
+```js
+{
+  _id: ObjectId(),
+  code: "CS101",
+  title: "Intro to Programming",
+  credits: 3,
+  instructor_id: ObjectId("...")
+}
+```
+
+### **enrollments**
+
+```js
+{
+  _id: ObjectId(),
+  student_id: ObjectId("..."),
+  course_id: ObjectId("..."),
+  semester: "2025-Spring",
+  grade: "A",
+  status: "active"
+}
+```
+
+This combination balances:
+
+* Efficient reads
+* Scalable writes
+* Avoids duplication
+* Maintains flexibility
+
+---
+
+## 4.6 Common MongoDB Schema Mistakes to Avoid
+
+| Mistake                                       | Why it's bad                | Fix                                 |
+| --------------------------------------------- | --------------------------- | ----------------------------------- |
+| Embedding unbounded lists                     | Document can exceed 16MB    | Move to referencing                 |
+| Duplicating shared entities                   | Hard to update consistently | Normalize into separate collections |
+| Using only text instead of `_id`              | No referential integrity    | Store ObjectId references           |
+| Performing SQL-style normalization everywhere | Slower reads                | Embed where logical                 |
+| Putting everything in one giant collection    | No domain structure         | Use purposeful collections          |
+
+Example of a bad design:
+
+```js
+{
+  name: "Aniket",
+  courses: [
+    {
+      code: "CS101",
+      instructor: { name: "Dr Sharma", ... },
+      department: {...}
+    }
+  ]
+}
+```
+
+This creates unnecessary nested duplication.
+
+---
+
+## 4.7 Final Rules (Short Summary)
+
+* Embed when data "belongs to" a document.
+* Reference when data "belongs to multiple" documents.
+* Normalize relationships that grow.
+* Use separate collections for many-to-many.
+* Model data based on query patterns, not theory.
+
+---
+
+## ASSIGNMENTS
+
+### **(Easy)**
+
+Rewrite the `"Sneha"` student document to include embedded `address` and `identity` fields.
+
+Data:
+
+* City: Pune
+* State: Maharashtra
+* ID: IT2025SNE002
+* Valid till: 2030-12-31
+
+**Solution:**
+
+```js
+db.students.updateOne(
+  { name: "Sneha" },
+  {
+    $set: {
+      address: {
+        city: "Pune",
+        state: "Maharashtra"
+      },
+      identity: {
+        id_card_no: "IT2025SNE002",
+        valid_till: ISODate("2030-12-31")
+      }
+    }
+  }
+);
+```
+
+---
+
+### **(Medium)**
+
+Which is better?
+
+Option A (embed):
+
+```js
+{
+  projects: [
+    { title: "AI Chatbot", year: 2024 }
+  ]
+}
+```
+
+Option B (reference):
+
+```js
+project_ids: [ObjectId("...")]
+```
+
+Scenario:
+
+* A student may work on many projects
+* Same project may have multiple students
+* Need to store project mentors, reviews, feedback, grades
+
+**Solution Explanation:**
+
+This is many-to-many + dynamic attributes → referencing.
+
+Final answer:
+
+```js
+// students
+project_ids: [ObjectId("...")]
+
+// projects
+{
+  _id: ObjectId(),
+  title: "AI Chatbot",
+  year: 2024
+}
+
+// mapping collection
+db.student_projects.insertOne({
+  student_id: ObjectId("..."),
+  project_id: ObjectId("..."),
+  grade: "A"
+});
+```
+
+---
+
+### **(Hard)**
+
+Redesign your entire students database into a **production-ready schema** supporting:
+
+* Students
+* Departments
+* Courses
+* Enrollments
+* Projects
+* Instructors
+* Address
+* Identity Card
+* Semester-wise Marks
+
+Provide full schema *in JSON structure*, not commands.
+
+**Solution (high-level full schema):**
+
+```js
+// STUDENTS
+{
+  _id: ObjectId(),
+  name: "Aniket",
+  age: 22,
+  department_id: ObjectId("..."),
+  address: {
+    city: "Noida",
+    state: "UP",
+    pincode: 201301
+  },
+  identity: {
+    id_card_no: "CSE2024ANI001",
+    valid_till: ISODate("2029-01-01")
+  },
+  education: [
+    { course: "BSc CS", year: 2022, institute: "DU" }
+  ],
+  graduation_date: ISODate("2024-07-01")
+}
+```
+
+```js
+// DEPARTMENTS
+{ _id: ObjectId(), code: "CSE", name: "Computer Science" }
+```
+
+```js
+// COURSES
+{
+  _id: ObjectId(),
+  code: "CS101",
+  title: "Intro to Programming",
+  credits: 3,
+  instructor_id: ObjectId("...")
+}
+```
+
+```js
+// ENROLLMENTS
+{
+  _id: ObjectId(),
+  student_id: ObjectId(),
+  course_id: ObjectId(),
+  semester: "2025-Spring",
+  grade: "A",
+  status: "active"
+}
+```
+
+```js
+// PROJECTS
+{
+  _id: ObjectId(),
+  title: "AI Chatbot",
+  year: 2024,
+  mentor_id: ObjectId("..."),
+  description: "Conversational AI"
+}
+```
+
+```js
+// STUDENT-PROJECT RELATION
+{
+  _id: ObjectId(),
+  student_id: ObjectId(),
+  project_id: ObjectId(),
+  role: "Developer",
+  grade: "A"
+}
+```
+
+This is scalable, normalized yet still fast for reads.
+
 
