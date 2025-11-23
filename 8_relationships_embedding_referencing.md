@@ -708,4 +708,351 @@ We covered here:
 * Schema redesign thinking
 
 ---
+---
+
+# **MongoDB Referencing Documents**
+
+Focus:
+
+* When to *reference instead of embed*
+* Designing related collections (`courses`, `departments`, `enrollments`)
+* Writing reference-based queries
+* 1e, 1m, 1h assignments
+* All examples based on your existing `students` data
+
+---
+
+## 3.1 What is Referencing?
+
+Referencing means **storing only a pointer (such as `_id`) to another document**, instead of storing the full object.
+
+Example:
+
+```js
+{
+  name: "Aniket",
+  course_ids: [
+    ObjectId("66c1c1111111111111111111"),
+    ObjectId("66c1c1222222222222222222")
+  ]
+}
+```
+
+vs. embedding full courses:
+
+```js
+{
+  name: "Aniket",
+  courses: [
+    { code: "CS101", title: "Intro to Programming" },
+    ...
+  ]
+}
+```
+
+Referencing avoids duplication and keeps collections modular.
+
+---
+
+## 3.2 When Should You Reference Instead of Embed?
+
+Use **Referencing** when:
+
+| Scenario                        | Why                                | Example                                    |
+| ------------------------------- | ---------------------------------- | ------------------------------------------ |
+| Many-to-Many                    | Avoid duplication & huge documents | Students ↔ Courses                         |
+| Large child data                | Document could exceed 16MB         | Student → All books issued over semesters  |
+| Frequent independent updates    | Avoid heavy writes                 | Course updated independently from students |
+| Shared data across many parents | Same data repeated                 | Departments shared by many students        |
+
+Typical real-world examples:
+
+* Students to Courses
+* Students to Departments
+* Products to Vendors
+* Users to Orders
+
+---
+
+## 3.3 Create Supporting Collections
+
+Now we create additional collections that make referencing meaningful.
+
+### Create `departments` collection
+
+```js
+db.departments.insertMany([
+  { _id: ObjectId(), code: "CSE", name: "Computer Science" },
+  { _id: ObjectId(), code: "PHY", name: "Physics" },
+  { _id: ObjectId(), code: "DS", name: "Data Science" },
+  { _id: ObjectId(), code: "ME", name: "Mechanical Engineering" }
+]);
+```
+
+### Create `courses` collection
+
+```js
+db.courses.insertMany([
+  { _id: ObjectId(), code: "CS101", title: "Intro to Programming", credits: 3 },
+  { _id: ObjectId(), code: "AI201", title: "Introduction to AI", credits: 4 },
+  { _id: ObjectId(), code: "ML301", title: "Machine Learning", credits: 4 },
+  { _id: ObjectId(), code: "PHY111", title: "Physics Fundamentals", credits: 3 }
+]);
+```
+
+(Sample `_id`s created automatically)
+
+---
+
+## 3.4 Reference Example — Link Student to a Department
+
+Let’s link `"Aniket"` to `"CSE"`.
+
+Step 1: Fetch department `_id`
+
+```js
+db.departments.findOne({ code: "CSE" });
+```
+
+Suppose it returns:
+
+```js
+{ _id: ObjectId("66aaa111aaa111aaa111aaa1"), code: "CSE", name: "Computer Science" }
+```
+
+Step 2: Reference this `_id` in student document:
+
+```js
+db.students.updateOne(
+  { name: "Aniket" },
+  { $set: { department_id: ObjectId("66aaa111aaa111aaa111aaa1") } }
+);
+```
+
+Now, instead of embedding department info, we reference it.
+
+---
+
+## 3.5 Query Using Reference
+
+### Get Aniket’s department details
+
+```js
+let student = db.students.findOne({ name: "Aniket" });
+db.departments.findOne({ _id: student.department_id });
+```
+
+### Using `$lookup` (MongoDB join)
+
+```js
+db.students.aggregate([
+  {
+    $lookup: {
+      from: "departments",
+      localField: "department_id",
+      foreignField: "_id",
+      as: "department"
+    }
+  },
+  { $project: { name: 1, department: 1 } }
+]);
+```
+
+---
+
+## 3.6 Referencing for Many-to-Many — Enrollments Table
+
+Instead of storing course IDs inside students, we create a separate collection:
+
+```js
+db.enrollments.insertMany([
+  {
+    student_name: "Aniket",
+    student_id: ObjectId("..."),
+    course_id: ObjectId("...CS101..."),
+    semester: "2025-Spring",
+    status: "active",
+    grade: "A"
+  },
+  {
+    student_name: "Aniket",
+    student_id: ObjectId("..."),
+    course_id: ObjectId("...AI201..."),
+    semester: "2025-Spring",
+    status: "active",
+    grade: "A"
+  }
+]);
+```
+
+Better: Instead of storing `student_name`, rely only on IDs.
+
+---
+
+## 3.7 Query All Courses of Aniket
+
+Using enrollments:
+
+```js
+db.enrollments.find({ student_id: ObjectId("...") });
+```
+
+Using join:
+
+```js
+db.enrollments.aggregate([
+  {
+    $lookup: {
+      from: "courses",
+      localField: "course_id",
+      foreignField: "_id",
+      as: "course_details"
+    }
+  },
+  { $match: { student_id: ObjectId("...") } }
+]);
+```
+
+---
+
+## ASSIGNMENTS (1e, 1m, 1h)
+
+### **(Easy)**
+
+Add a reference linking `"Sourav"` to `"Mathematics"` department.
+
+Department data (assume):
+
+```
+code: "MATH"
+_id: 66def999abc999abc999abc9
+```
+
+**Solution:**
+
+```js
+db.students.updateOne(
+  { name: "Sourav" },
+  { $set: { department_id: ObjectId("66def999abc999abc999abc9") } }
+);
+```
+
+Verify:
+
+```js
+db.students.find({ name: "Sourav" }, { department_id: 1 });
+```
+
+---
+
+### **(Medium)**
+
+Store enrollment details for `"Isha"`:
+
+| Course           | Code  | Semester    |
+| ---------------- | ----- | ----------- |
+| Machine Learning | ML301 | 2025-Spring |
+| Python           | CS101 | 2025-Spring |
+
+Assume:
+
+```
+CS101 _id = AAAAA111AAA
+ML301 _id = BBBBB222BBB
+Isha _id = SSSSS333SSS
+```
+
+**Solution:**
+
+```js
+db.enrollments.insertMany([
+  {
+    student_id: ObjectId("SSSSS333SSS"),
+    course_id: ObjectId("BBBBB222BBB"),
+    semester: "2025-Spring",
+    status: "active"
+  },
+  {
+    student_id: ObjectId("SSSSS333SSS"),
+    course_id: ObjectId("AAAAA111AAA"),
+    semester: "2025-Spring",
+    status: "active"
+  }
+]);
+```
+
+Query all enrollments:
+
+```js
+db.enrollments.find({ student_id: ObjectId("SSSSS333SSS") });
+```
+
+---
+
+### **(Hard)**
+
+Design a fully normalized referencing-based schema for:
+
+* students
+* courses
+* enrollments
+* instructors
+
+Rules:
+
+* Each course has one instructor.
+* Students enroll in many courses.
+* Courses have many students.
+* Instructors teach many courses.
+
+**Your task:**
+Provide the schema structure in MongoDB document format (not SQL), but do NOT embed full objects.
+
+**Solution:**
+
+```js
+// STUDENTS
+{
+  _id: ObjectId(),
+  name: "Aniket",
+  age: 22,
+  department_id: ObjectId("..."),
+  // No courses embedded
+}
+
+// COURSES
+{
+  _id: ObjectId(),
+  code: "AI201",
+  title: "Introduction to AI",
+  credits: 4,
+  instructor_id: ObjectId("...")  // referenced
+}
+
+// INSTRUCTORS
+{
+  _id: ObjectId(),
+  name: "Dr. Sharma",
+  department_id: ObjectId("...")
+}
+
+// ENROLLMENTS (junction collection)
+{
+  _id: ObjectId(),
+  student_id: ObjectId("..."),
+  course_id: ObjectId("..."),
+  semester: "2025-Spring",
+  status: "active",
+  grade: "A"
+}
+```
+
+Why this is correct:
+
+* No duplication of course data across students
+* Enrollment holds dynamic attributes
+* Instructor assigned once but queryable via `$lookup`
+* Works for large systems
+
+---
 
