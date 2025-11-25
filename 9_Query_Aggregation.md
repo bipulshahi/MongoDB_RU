@@ -369,7 +369,23 @@ db.students.aggregate([
 ]);
 ```
 
-### Example 3 — Project only Math score:
+### Example 3 — Add a new field: name in uppercase:
+
+```js
+db.students.aggregate([
+  { $match: { major: "Computer Science" } },
+  { 
+    $project: { 
+      name: 1, 
+      subjects: 1, 
+      name_upper: { $toUpper: "$name" }, 
+      _id: 0 
+    } 
+  }
+]);
+```
+
+### Example 4 — Project only Math score:
 
 ```js
 db.students.aggregate([
