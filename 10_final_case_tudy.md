@@ -129,6 +129,118 @@ This output **cannot be produced using find()**.
 
 ---
 
+**one simple case study** that uses only:
+
+* `$unwind`
+* `$group`
+* `$addFields`
+* `$round`
+* `$project`
+
+And it includes **performance_category** based on rounded average score.
+
+---
+
+# **CASE STUDY — Student Performance Categorization**
+
+### **Problem Statement**
+
+The university wants a very simple report showing:
+
+* Student Name
+* Average Score (rounded to nearest whole number)
+* Performance Category (Low / Medium / High)
+
+Performance rules:
+
+| Rounded Avg Score | Category |
+| ----------------- | -------- |
+| 0–70              | Low      |
+| 71–85             | Medium   |
+| > 85              | High     |
+
+---
+
+# **Solution Pipeline (Very Simple)**
+
+```js
+db.students.aggregate([
+  { $unwind: "$scores" },
+
+  // Step 1: Calculate average score per student
+  {
+    $group: {
+      _id: "$name",
+      avg_score: { $avg: "$scores.score" }
+    }
+  },
+
+  // Step 2: Add rounded score
+  {
+    $addFields: {
+      avg_score_rounded: { $round: ["$avg_score", 0] }
+    }
+  },
+
+  // Step 3: Add performance category
+  {
+    $addFields: {
+      performance_category: {
+        $cond: [
+          { $lte: ["$avg_score_rounded", 70] }, "Low",
+          {
+            $cond: [
+              { $lte: ["$avg_score_rounded", 85] }, "Medium",
+              "High"
+            ]
+          }
+        ]
+      }
+    }
+  },
+
+  // Step 4: Clean output
+  {
+    $project: {
+      name: "$_id",
+      avg_score_rounded: 1,
+      performance_category: 1,
+      _id: 0
+    }
+  }
+]);
+```
+
+---
+
+# **Expected Output (Sample)**
+
+```
+{
+  name: "Aniket",
+  avg_score_rounded: 90,
+  performance_category: "High"
+}
+{
+  name: "Riya",
+  avg_score_rounded: 87,
+  performance_category: "High"
+}
+{
+  name: "Tanya",
+  avg_score_rounded: 71,
+  performance_category: "Medium"
+}
+{
+  name: "Arjun",
+  avg_score_rounded: 92,
+  performance_category: "High"
+}
+```
+
+---
+
+
 # **CASE STUDY 2 — Tag Levels: Small, Medium, High**
 
 We will assign tags based on **credits_earned**:
